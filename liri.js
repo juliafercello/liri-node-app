@@ -1,20 +1,20 @@
-//include packages
+//Include packages
 var Spotify = require('node-spotify-api');
 var moment = require("moment");
 var axios = require("axios");
 var fs = require("fs");
 
-//Import Keys for Spotify using dotenv
+//Import api key and secret for Spotify using dotenv
 require("dotenv").config();
 var keys = require("./keys.js");
 var spotify = new Spotify(keys.spotify);
 
-//Global Vars for the command and search parameter
+//Global Variables for the command and search parameter
 var command = process.argv[2];
 var search = process.argv.slice(3).join(" ");
 var movieSearch = false;
 
-//function to build search URL
+//Function to build search URL for axios
 function buildSearchURL() {
     if (movieSearch) {
         var queryUrl = "http://www.omdbapi.com/?t=" + search + "&y=&plot=short&apikey=trilogy";
@@ -38,36 +38,57 @@ function getResults(queryUrl) {
         })
         .catch(function (error) {
             console.log(error);
+            logData(error);
         });
 }
 
 //Display Movie Info
 function displayMovieInfo(response) {
-    console.log("Title: " + JSON.stringify(response.data.Title, null, 2));
-    console.log("Released: " + JSON.stringify(response.data.Year, null, 2));
-    console.log("IMDB Rating: " + JSON.stringify(response.data.imdbRating, null, 2));
-    //Find rotten tomatoes better
-    console.log("Rotten Tomatoes: " + JSON.stringify(response.data.Ratings[1].Value, null, 2));
-    console.log("Country: " + JSON.stringify(response.data.Country, null, 2));
-    console.log("Language: " + JSON.stringify(response.data.Language, null, 2));
-    console.log("Plot: " + JSON.stringify(response.data.Plot, null, 2));
-    console.log("Actors: " + JSON.stringify(response.data.Actors, null, 2));
+    var movieInfo = {
+        title: response.data.Title,
+        released: response.data.Year,
+        imdbRating: response.data.imdbRating,
+        rottenTomatoes: "",
+        country: response.data.Country,
+        language: response.data.Language,
+        plot: response.data.Plot,
+        actors: response.data.Actors
+    }
+
+    //find rotton tomatoes in response ("Source": "Rotten Tomatoes")
+    for (var i = 0; i < response.data.Ratings.length; i++) {
+        if (response.data.Ratings[i].Source == "Rotten Tomatoes") {
+            movieInfo.rottenTomatoes = response.data.Ratings[i].Value
+        }
+    }
+    console.log(JSON.stringify(movieInfo, null, 2));
+    logData(movieInfo);
 }
 
 //Display Concert Info
 function displayConcertInfo(response) {
     if (response.data.length > 0) {
-        console.log(search + " is playing here: ");
-        console.log("*****************************************************")
+        var searchMessage = search + " is playing here: "
+        console.log(searchMessage);
+        var concertInfo = [searchMessage];
+
         for (var i = 0; i < response.data.length; i++) {
-            console.log("Date: " + moment(response.data[i].datetime).format("MM/DD/YYYY") +
-                "\nVenue: " + response.data[i].venue.name + " \nLocation: " + response.data[i].venue.city + " " +
-                response.data[i].venue.region + " " + response.data[i].venue.country)
-            console.log("*****************************************************")
+
+            var concert = "Date: " + moment(response.data[i].datetime).format("MM/DD/YYYY") +
+                " Venue: " + response.data[i].venue.name + " - " + response.data[i].venue.city + " " +
+                response.data[i].venue.region + " " + response.data[i].venue.country;
+
+            console.log(concert);
+
+            concertInfo.push(concert);
         }
+        logData(concertInfo)
+
     }
     else {
-        console.log("Sad News - no concerts were found for " + search);
+        var noResults = "Sad News - no concerts were found for " + search
+        console.log(noResults);
+        logData(noResults);
     }
 }
 
@@ -75,12 +96,33 @@ function displayConcertInfo(response) {
 function getSong() {
     spotify.search({ type: 'track', query: search, limit: 1 }, function (err, data) {
         if (err) {
+            logData(err)
             return console.log('Error occurred: ' + err);
         }
-        console.log("Artists: " + data.tracks.items[0].artists[0].name); //DO THIS BETTER
-        console.log("Song Name: " + data.tracks.items[0].name);
-        console.log("Preview Link: " + data.tracks.items[0].preview_url);
-        console.log("Album: " + data.tracks.items[0].album.name);
+
+        var songInfo = {
+            artists: [],
+            songName: data.tracks.items[0].name,
+            previewLink: data.tracks.items[0].preview_url,
+            album: data.tracks.items[0].album.name
+        }
+
+        //populate the artists for the song
+        for (var i = 0; i < data.tracks.items[0].artists.length; i++) {
+            songInfo.artists.push(data.tracks.items[0].artists[i].name)
+        }
+
+        console.log(JSON.stringify(songInfo, null, 2));
+        logData(songInfo);
+    });
+}
+
+//Log User Input and Result
+function logData(results) {
+    fs.appendFile("log.txt", " \n" + command + " " + search + " " + JSON.stringify(results, null, 2), function (error) {
+        if (error) {
+            console.log(error);
+        }
     });
 }
 
@@ -100,18 +142,19 @@ else if (command === "concert-this") {
 }
 else if (command === "spotify-this-song") {
     if (!search) {
-        search = "The Sign";
+        search = "Ace of Base The Sign";
     }
     getSong();
 }
 else if (command === "do-what-it-says") {
     fs.readFile("random.txt", "utf8", function (error, data) {
         if (error) {
+            logData(error)
             return console.log("Unable to do what it says")
         }
         var random = data.split(",");
         search = random.slice(1).join(" ");
-        search = search.replace(/"/g,"");
+        search = search.replace(/"/g, "");
 
         if (random[0] === "movie-this") {
             movieSearch = true;
@@ -125,8 +168,8 @@ else if (command === "do-what-it-says") {
         }
     });
 }
-
-// Bonus
-// In addition to logging the data to your terminal/bash window, output the data to a .txt file called log.txt.
-// Make sure you append each command you run to the log.txt file.
-// Do not overwrite your file each time you run a command.
+else {
+    var unknownCommand = "Sorry, I don't understand.  Maybe Siri can help you."
+    console.log(unknownCommand);
+    logData(unknownCommand);
+}
