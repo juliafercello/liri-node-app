@@ -3,6 +3,7 @@ var Spotify = require('node-spotify-api');
 var moment = require("moment");
 var axios = require("axios");
 var fs = require("fs");
+const cTable = require('console.table');
 
 //Import api key and secret for Spotify using dotenv
 require("dotenv").config();
@@ -61,7 +62,8 @@ function displayMovieInfo(response) {
             movieInfo.rottenTomatoes = response.data.Ratings[i].Value
         }
     }
-    console.log(JSON.stringify(movieInfo, null, 2));
+    // console.log(JSON.stringify(movieInfo, null, 2));
+    console.table(movieInfo);
     logData(movieInfo);
 }
 
@@ -79,10 +81,10 @@ function displayConcertInfo(response) {
                 response.data[i].venue.region + " " + response.data[i].venue.country;
 
             console.log(concert);
-
             concertInfo.push(concert);
         }
         logData(concertInfo)
+
 
     }
     else {
@@ -112,7 +114,9 @@ function getSong() {
             songInfo.artists.push(data.tracks.items[0].artists[i].name)
         }
 
-        console.log(JSON.stringify(songInfo, null, 2));
+        // console.log(JSON.stringify(songInfo, null, 2));
+        console.table(songInfo);
+
         logData(songInfo);
     });
 }
